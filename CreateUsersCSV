@@ -1,17 +1,32 @@
 Import-Module ActiveDirectory
 
-# Set CSV path
+# Path to the CSV
 $csvPath = "C:\Users\Administrator\Downloads\AD Build\ImportUsers.csv"
 $users = Import-Csv -Path $csvPath
 
+# Step 1: Create all needed groups if they don’t exist
+$departments = $users | Select-Object -ExpandProperty department -Unique
+foreach ($dept in $departments) {
+    $groupName = "${dept}_Group"
+    if (-not (Get-ADGroup -Filter { Name -eq $groupName })) {
+        try {
+            New-ADGroup -Name $groupName -GroupScope Global -GroupCategory Security -Path "OU=Groups,DC=kfausch,DC=local"
+            Write-Host "Created group: $groupName" -ForegroundColor Green
+        } catch {
+            Write-Host "Failed to create group $groupName: $($_.Exception.Message)" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "Group already exists: $groupName" -ForegroundColor Yellow
+    }
+}
+
+# Step 2: Create users and assign them to the right group
 foreach ($line in $users) {
-    # Validate required fields
     if (-not $line.Given -or -not $line.Surname -or -not $line.Path -or -not $line.department) {
         Write-Host "Skipping invalid row (missing required fields): $($line | Out-String)" -ForegroundColor Yellow
         continue
     }
 
-    # Construct values
     $FullName = "$($line.Given) $($line.Surname)"
     $SamAccountName = "$($line.Given).$($line.Surname)"
     $UPN = "$($line.Given).$($line.Surname)@kfausch.local"
@@ -19,13 +34,12 @@ foreach ($line in $users) {
 
     Write-Host "Creating user: $FullName, Sam: $SamAccountName, UPN: $UPN, Path: $($line.Path), Group: $GroupName" -ForegroundColor Cyan
 
-    # Check if user already exists
+    # Skip if user already exists
     if (Get-ADUser -Filter { SamAccountName -eq $SamAccountName }) {
         Write-Host "User $SamAccountName already exists. Skipping..." -ForegroundColor Yellow
         continue
     }
 
-    # Create user
     try {
         New-ADUser `
             -Name $FullName `
@@ -41,22 +55,18 @@ foreach ($line in $users) {
             -Company $line.Company `
             -Enabled $true `
             -AccountPassword (ConvertTo-SecureString "P@ssword" -AsPlainText -Force)
-        
+
         Write-Host "User $FullName created successfully." -ForegroundColor Green
     } catch {
-        Write-Host "Failed to create user $FullName: $_" -ForegroundColor Red
+        Write-Host "Failed to create user $FullName: $($_.Exception.Message)" -ForegroundColor Red
         continue
     }
 
-    # Add to group if it exists
-    if (Get-ADGroup -Filter { Name -eq $GroupName }) {
-        try {
-            Add-ADGroupMember -Identity $GroupName -Members $SamAccountName
-            Write-Host "Added $SamAccountName to group $GroupName." -ForegroundColor Green
-        } catch {
-            Write-Host "Failed to add $SamAccountName to group $GroupName: $_" -ForegroundColor Red
-        }
-    } else {
-        Write-Host "Group $GroupName does not exist. Skipping group assignment." -ForegroundColor Yellow
+    try {
+        Add-ADGroupMember -Identity $GroupName -Members $SamAccountName
+        Write-Host "Added $SamAccountName to $GroupName" -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to add $SamAccountName to group $GroupName: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
+
