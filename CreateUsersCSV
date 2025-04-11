@@ -1,8 +1,8 @@
 Import-Module ActiveDirectory
 
-# Adjust with your actual path
+# Import CSV without headers
 $groupCsvPath = "C:\Users\Administrator\Downloads\AD Build\ImportGroups.csv"
-$groups = Import-Csv -Path $groupCsvPath
+$groups = Import-Csv -Path $groupCsvPath -Header "GroupName","GroupCategory","GroupScope","Path"
 
 foreach ($group in $groups) {
     $groupName = "$($group.GroupName)_Group"
@@ -25,6 +25,7 @@ foreach ($group in $groups) {
         Write-Host "Group already exists: $groupName" -ForegroundColor Yellow
     }
 }
+
 
 # Path to the CSV
 $csvPath = "C:\Users\Administrator\Downloads\AD Build\ImportUsers.csv"
