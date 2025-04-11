@@ -1,5 +1,28 @@
 Import-Module ActiveDirectory
 
+Import-Module ActiveDirectory
+
+# Load groups from CSV
+$groupCsvPath = "C:\Users\Administrator\Downloads\AD Build\ImportGroups.csv"
+$groups = Import-Csv -Path $groupCsvPath
+
+foreach ($group in $groups) {
+    $groupName = $group.GroupName
+    $groupPath = $group.Path
+
+    if (-not (Get-ADGroup -Filter { Name -eq $groupName })) {
+        try {
+            New-ADGroup -Name $groupName -GroupScope Global -GroupCategory Security -Path $groupPath
+            Write-Host "Created group: $groupName in $groupPath" -ForegroundColor Green
+        } catch {
+            Write-Host "Failed to create group $groupName: $($_.Exception.Message)" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "Group already exists: $groupName" -ForegroundColor Yellow
+    }
+}
+
+
 # Path to the CSV
 $csvPath = "C:\Users\Administrator\Downloads\AD Build\ImportUsers.csv"
 $users = Import-Csv -Path $csvPath
