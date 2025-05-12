@@ -1,0 +1,18 @@
+# Set Home Folder for All Domain Users
+Import-Module ActiveDirectory
+
+# Define the base UNC path
+$basePath = "\\kfausch-DC1"
+
+# Get all users in the domain
+Get-ADUser -Filter * -Properties SamAccountName, HomeDirectory, HomeDrive | ForEach-Object {
+    $username = $_.SamAccountName
+    $homeFolder = "$basePath\$username"
+
+    # Set HomeDrive and HomeDirectory
+    Set-ADUser -Identity $username `
+               -HomeDirectory $homeFolder `
+               -HomeDrive "H:"
+    
+    Write-Host "Updated $username: H: mapped to $homeFolder"
+}
