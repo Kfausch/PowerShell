@@ -1,0 +1,73 @@
+# Final Project PowerShell Script
+# Author: [Your Name]
+# Date: [Date]
+
+# Set output path
+$reportPath = "C:\FinalProjectReport.txt"
+New-Item -Path $reportPath -ItemType File -Force | Out-Null
+
+# User Report
+Add-Content $reportPath "`n=== USER REPORT ===`n"
+Get-ADUser -Filter * -Properties DistinguishedName, HomeDirectory, Company | ForEach-Object {
+    Add-Content $reportPath "Name: $($_.Name)"
+    Add-Content $reportPath "  DN: $($_.DistinguishedName)"
+    Add-Content $reportPath "  HomeDirectory: $($_.HomeDirectory)"
+    Add-Content $reportPath "  Company: $($_.Company)`n"
+}
+
+# Group Report
+Add-Content $reportPath "`n=== GROUP REPORT ===`n"
+Get-ADGroup -Filter * | ForEach-Object {
+    Add-Content $reportPath "Group: $($_.Name)"
+    $members = Get-ADGroupMember -Identity $_.DistinguishedName -ErrorAction SilentlyContinue
+    foreach ($member in $members) {
+        Add-Content $reportPath "  Member: $($member.Name)"
+    }
+    Add-Content $reportPath ""
+}
+
+# OU Report
+Add-Content $reportPath "`n=== OU REPORT ===`n"
+Get-ADOrganizationalUnit -Filter * | ForEach-Object {
+    Add-Content $reportPath "OU: $($_.Name)"
+}
+
+# Home Directory Permissions Report
+Add-Content $reportPath "`n=== HOME DIRECTORY PERMISSIONS ===`n"
+Get-ADUser -Filter * -Properties HomeDirectory | Where-Object { $_.HomeDirectory } | ForEach-Object {
+    if (Test-Path $_.HomeDirectory) {
+        Add-Content $reportPath "`nUser: $($_.Name)"
+        Add-Content $reportPath "Path: $($_.HomeDirectory)"
+        Get-Acl $_.HomeDirectory | Format-List | Out-String | Add-Content $reportPath
+    } else {
+        Add-Content $reportPath "`nUser: $($_.Name) - Home directory path '$($_.HomeDirectory)' does not exist."
+    }
+}
+
+# Departmental Folder Permissions Report
+Add-Content $reportPath "`n=== DEPARTMENTAL FOLDER PERMISSIONS ===`n"
+$departmentFolders = @(
+    "C:\DFSRoot\Accounting",
+    "C:\DFSRoot\Developers",
+    "C:\DFSRoot\Executive",
+    "C:\DFSRoot\InfoTech",
+    "C:\DFSRoot\Manufacturing",
+    "C:\DFSRoot\Sales",
+    "C:\DFSRoot\Shield"
+)
+foreach ($folder in $departmentFolders) {
+    if (Test-Path $folder) {
+        Add-Content $reportPath "`nFolder: $folder"
+        Get-Acl $folder | Format-List | Out-String | Add-Content $reportPath
+    } else {
+        Add-Content $reportPath "`nFolder: $folder does not exist."
+    }
+}
+
+# Computer Report
+Add-Content $reportPath "`n=== COMPUTER REPORT ===`n"
+Get-ADComputer -Filter * | ForEach-Object {
+    Add-Content $reportPath "Computer: $($_.Name)"
+}
+
+Write-Host "Report generated at: $reportPath"
