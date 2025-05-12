@@ -1,0 +1,28 @@
+Import-Module ActiveDirectory
+
+$homeRoot = "C:\Shares\Home"
+$shareRoot = "\\kfausch-DC1\Home"
+
+# Get all users
+Get-ADUser -Filter * -Properties SamAccountName | ForEach-Object {
+    $username = $_.SamAccountName
+    $folderPath = Join-Path -Path $homeRoot -ChildPath $username
+
+    # Create folder if it doesn't exist
+    if (!(Test-Path $folderPath)) {
+        New-Item -ItemType Directory -Path $folderPath | Out-Null
+        Write-Host "Created folder: $folderPath"
+
+        # Set NTFS permissions (FullControl for the user only)
+        $acl = Get-Acl $folderPath
+        $identity = "$env:USERDOMAIN\$username"
+        $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($identity, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
+        $acl.SetAccessRuleProtection($true, $false)  # Disable inheritance
+        $acl.SetAccessRule($accessRule)
+        Set-Acl $folderPath $acl
+
+        Write-Host "Permissions set for $username"
+    } else {
+        Write-Host "Folder already exists: $folderPath"
+    }
+}
