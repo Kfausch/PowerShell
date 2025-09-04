@@ -1,0 +1,47 @@
+Import-Module ActiveDirectory
+
+# Define OUs and users
+$departments = @{
+    "Sales_OU"      = @("Jim Halpert","Stanley Hudson","Dwight Schrute")
+    "Executive_OU"  = @("Michael Scott","Gene Simmons","Jan Levenson")
+    "Accounting_OU" = @("Kevin Malone","Noah Count","Angela Marten")
+    "Info_OU"       = @("David Jackson","Jose Gomez","Chloe Obrien")
+    "HR_OU"         = @("Holly Flax","Toby Flenderson")
+    "Info_Tech"     = @("First Last","Rick Sanchez")
+}
+
+# Domain root
+$domainDN = "DC=kfausch,DC=local"
+
+foreach ($ou in $departments.Keys) {
+    # Create a security group for the OU if it doesn’t exist
+    $groupName = "$ou-Group"
+    if (-not (Get-ADGroup -Filter { Name -eq $groupName } -ErrorAction SilentlyContinue)) {
+        New-ADGroup -Name $groupName -GroupScope Global -GroupCategory Security -Path "OU=$ou,$domainDN"
+        Write-Host "Created group $groupName in OU=$ou"
+    }
+
+    # Create users for the OU
+    foreach ($fullName in $departments[$ou]) {
+        $names = $fullName -split " "
+        $first = $names[0]
+        $last = $names[-1]
+        $sam = ($first.Substring(0,1) + $last).ToLower()   # e.g., jhalpert
+        $upn = "$sam@kfausch.local"
+
+        if (-not (Get-ADUser -Filter { SamAccountName -eq $sam } -ErrorAction SilentlyContinue)) {
+            New-ADUser -Name $fullName `
+                       -GivenName $first `
+                       -Surname $last `
+                       -SamAccountName $sam `
+                       -UserPrincipalName $upn `
+                       -AccountPassword (ConvertTo-SecureString "P@ssw0rd123" -AsPlainText -Force) `
+                       -Path "OU=$ou,$domainDN" `
+                       -Enabled $true
+            Write-Host "Created user $fullName in OU=$ou"
+        }
+
+        # Add user to their group
+        Add-ADGroupMember -Identity $groupName -Members $sam -ErrorAction SilentlyContinue
+    }
+}
