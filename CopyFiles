@@ -1,0 +1,46 @@
+# Copy all files from Archive -> network share, then move the originals to Archive\BAK
+
+$Source = 'C:\FloorPrinting\AKPizza\AKUtility4\Wall St Label Printer ZT610R\Archive'
+$Dest   = '\\aksvrfs1\jfdata\floorlabels'
+$Bak    = Join-Path $Source 'BAK'
+
+# Ensure destination and backup folders exist
+foreach ($p in @($Dest, $Bak)) {
+    if (-not (Test-Path -LiteralPath $p)) {
+        New-Item -ItemType Directory -Path $p -Force | Out-Null
+    }
+}
+
+# Get files (not folders) currently in the Archive
+$files = Get-ChildItem -LiteralPath $Source -File -ErrorAction Stop
+
+if (-not $files) {
+    Write-Host "No files found in '$Source'. Nothing to do."
+    return
+}
+
+foreach ($file in $files) {
+    try {
+        # 1) Copy to destination (overwrite if a file with the same name already exists)
+        Copy-Item -LiteralPath $file.FullName -Destination $Dest -Force -ErrorAction Stop
+
+        # 2) Move the original to BAK.
+        #    To avoid overwriting a prior backup, make the name unique if needed.
+        $targetPath = Join-Path $Bak $file.Name
+        if (Test-Path -LiteralPath $targetPath) {
+            $base = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
+            $ext  = [System.IO.Path]::GetExtension($file.Name)
+            $stamp = (Get-Date).ToString('yyyyMMdd_HHmmssfff')
+            $targetPath = Join-Path $Bak "$base`_$stamp$ext"
+        }
+
+        Move-Item -LiteralPath $file.FullName -Destination $targetPath -ErrorAction Stop
+        Write-Host "Copied '$($file.Name)' to '$Dest' and moved original to '$targetPath'."
+    }
+    catch {
+        # If copy fails (e.g., file locked), we do NOT move the original.
+        Write-Warning "Failed on '$($file.FullName)': $($_.Exception.Message)"
+    }
+}
+
+Write-Host "Done."
