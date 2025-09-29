@@ -1,0 +1,24 @@
+sudo wget https://archive.kali.org/archive-keyring.gpg -O /usr/share/keyrings/kali-archive-keyring.gpg
+sudo apt update -y
+sudo apt upgrade -y
+
+sudo dpkg --configure -a
+sudo apt --fix-broken install
+
+lsb_release -a
+
+sudo apt install gvm -y
+
+sudo apt install -y postgresql-common
+sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+sudo apt install postgresql-17 postgresql-client-17
+sudo pg_dropcluster 17 main --stop
+sudo nano /etc/postgresql/14/main/postgresql.conf   # replace timezone US/Eastern → America/Chicago
+sudo pg_upgradecluster 14 main
+sudo pg_dropcluster 14 main
+sudo apt purge postgresql-14 postgresql-client-14
+
+sudo gvm-setup
+sudo apt update -y && sudo apt upgrade -y
+sudo gvm-check-setup
+sudo gvm-start
