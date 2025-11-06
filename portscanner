@@ -1,22 +1,17 @@
-import nmap
+import subprocess
 
-scanner = nmap.PortScanner()
-ports = "1-1024"
+# Port range variable
+port_range = "1-1024"
 
-with open("ip.txt") as f:
-    for ip in f:
-        ip = ip.strip()
-        if not ip:
-            continue
-        # -Pn skips host discovery (treat host as up even if ping blocked)
-        # run with sudo if you plan to use some scan types (e.g. -sS)
-        scanner.scan(ip, ports, '-Pn')
-        hosts = scanner.all_hosts()
-        if not hosts:
-            print(f"{ip} host down or no results")
-            continue
-        host = hosts[0]
-        for proto in scanner[host].all_protocols():
-            for port in sorted(scanner[host][proto].keys()):
-                state = scanner[host][proto][port]["state"]
-                print(f"{host} port {port} {state}")
+# Read IPs from file
+with open('ip.txt', 'r') as file:
+    lines = file.readlines()
+
+# Loop through each line
+for line in lines:
+    parts = line.strip().split()
+    if len(parts) >= 2:
+        ip = parts[1]
+        # Run nmap scan
+        command = f"nmap -p {port_range} {ip}"
+        subprocess.run(command, shell=True)
