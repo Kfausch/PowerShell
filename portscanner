@@ -4,26 +4,24 @@ import nmap
 with open('ip.txt', 'r') as file:
     ips = [line.strip() for line in file if line.strip()]
 
-# Port range as variable (change this to adjust)
-port_range = '1-1024'
-
-# Parse port range
-start_port, end_port = map(int, port_range.split('-'))
+# Define port range
+start_port = 1
+end_port = 1024
+port_range = f"{start_port}-{end_port}"
 
 # Create scanner
 nm = nmap.PortScanner()
 
 # Loop through IPs
 for ip in ips:
-    ip = str(ip)  # Ensure ip is a string
     nm.scan(ip, port_range)
-    
-    if ip in nm and nm[ip].state() == 'up':
+
+    if ip in nm.all_hosts() and nm[ip].state() == 'up':
         for port in range(start_port, end_port + 1):
             if 'tcp' in nm[ip] and port in nm[ip]['tcp']:
                 state = nm[ip]['tcp'][port]['state']
             else:
                 state = 'closed'
-            print(f"IP {ip} - port {port} - state {state}")
+            print(f"{ip} port {port} {state}")
     else:
         print(f"IP {ip} not reachable")
