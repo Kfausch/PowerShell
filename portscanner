@@ -1,28 +1,22 @@
-import subprocess
+import nmap
 
-# Port range variable
-port_range = "1-1024"
-
-# Parse port range
-start, end = map(int, port_range.split('-'))
-
-# Read IPs from file
+# Read IP addresses from file
 with open('ip.txt', 'r') as file:
-    lines = file.readlines()
+    ips = [line.strip() for line in file if line.strip()]
 
-# Loop through each line
-for line in lines:
-    parts = line.strip().split()
-    if len(parts) >= 2:
-        ip = parts[1]
-        # Loop through each port
-        for port in range(start, end + 1):
-            command = f"nmap -p {port} {ip}"
-            result = subprocess.run(command, shell=True, capture_output=True, text=True)
-            output = result.stdout
-            for out_line in output.splitlines():
-                if '/tcp' in out_line:
-                    out_parts = out_line.split()
-                    if len(out_parts) >= 2:
-                        state = out_parts[1]
-                        print(f"{ip} port {port} {state}")
+# Port range as variable (change this to adjust)
+port_range = '1-1024'
+
+# Create scanner
+nm = nmap.PortScanner()
+
+# Loop through IPs
+for ip in ips:
+    # Scan the IP with port range
+    nm.scan(ip, port_range)
+    
+    # Loop through scanned ports and print states
+    if 'tcp' in nm[ip]:
+        for port in nm[ip]['tcp']:
+            state = nm[ip]['tcp'][port]['state']
+            print(f"IP {ip} - port {port} - state {state}")
