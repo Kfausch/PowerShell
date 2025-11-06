@@ -8,9 +8,15 @@ with open("ip.txt") as f:
         ip = ip.strip()
         if not ip:
             continue
-        scanner.scan(ip, ports)
-        for host in scanner.all_hosts():
-            for proto in scanner[host].all_protocols():
-                for port in sorted(scanner[host][proto].keys()):
-                    state = scanner[host][proto][port]["state"]
-                    print(f"{host} {port} {state}")
+        # -Pn skips host discovery (treat host as up even if ping blocked)
+        # run with sudo if you plan to use some scan types (e.g. -sS)
+        scanner.scan(ip, ports, '-Pn')
+        hosts = scanner.all_hosts()
+        if not hosts:
+            print(f"{ip} host down or no results")
+            continue
+        host = hosts[0]
+        for proto in scanner[host].all_protocols():
+            for port in sorted(scanner[host][proto].keys()):
+                state = scanner[host][proto][port]["state"]
+                print(f"{host} port {port} {state}")
