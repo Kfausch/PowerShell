@@ -15,6 +15,7 @@ nm = nmap.PortScanner()
 
 # Loop through IPs
 for ip in ips:
+    ip = str(ip)  # Ensure ip is a string
     nm.scan(ip, port_range)
     
     if ip in nm and nm[ip].state() == 'up':
