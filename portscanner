@@ -1,0 +1,16 @@
+import nmap
+
+scanner = nmap.PortScanner()
+ports = "1-1024"
+
+with open("ip.txt") as f:
+    for ip in f:
+        ip = ip.strip()
+        if not ip:
+            continue
+        scanner.scan(ip, ports)
+        for host in scanner.all_hosts():
+            for proto in scanner[host].all_protocols():
+                for port in sorted(scanner[host][proto].keys()):
+                    state = scanner[host][proto][port]["state"]
+                    print(f"{host} {port} {state}")
