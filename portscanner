@@ -7,16 +7,22 @@ with open('ip.txt', 'r') as file:
 # Port range as variable (change this to adjust)
 port_range = '1-1024'
 
+# Parse port range
+start_port, end_port = map(int, port_range.split('-'))
+
 # Create scanner
 nm = nmap.PortScanner()
 
 # Loop through IPs
 for ip in ips:
-    # Scan the IP with port range
     nm.scan(ip, port_range)
     
-    # Loop through scanned ports and print states
-    if 'tcp' in nm[ip]:
-        for port in nm[ip]['tcp']:
-            state = nm[ip]['tcp'][port]['state']
+    if ip in nm and nm[ip].state() == 'up':
+        for port in range(start_port, end_port + 1):
+            if 'tcp' in nm[ip] and port in nm[ip]['tcp']:
+                state = nm[ip]['tcp'][port]['state']
+            else:
+                state = 'closed'
             print(f"IP {ip} - port {port} - state {state}")
+    else:
+        print(f"IP {ip} not reachable")
