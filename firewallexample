@@ -1,0 +1,70 @@
+#!/bin/bash
+# rc.firewall - copy1
+# KF Lab - CentOS FW
+# WAN (external) = ens192 (10.240.101.85)
+# LAN (internal) = ens224 (192.168.10.1)
+
+### Flush old rules
+iptables -F
+iptables -t nat -F
+iptables -X
+
+### Enable routing
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+### Default policies: secure baseline
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT DROP
+
+### Allow loopback
+iptables -A INPUT  -i lo -j ACCEPT
+iptables -A OUTPUT -o lo -j ACCEPT
+
+### Allow established / related traffic
+iptables -A INPUT   -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A OUTPUT  -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# ------------------------------------------------------------
+# PART 1 REQUIRED RULES
+# ------------------------------------------------------------
+
+### (1) INTERNAL clients -> SSH into firewall (LAN side)
+iptables -A INPUT  -i ens224 -s 192.168.10.0/24 -p tcp --dport 22 -j ACCEPT
+iptables -A OUTPUT -o ens224 -d 192.168.10.0/24 -p tcp --sport 22 -j ACCEPT
+
+### (2) ANYONE on WAN -> Web on firewall (HTTP + HTTPS)
+iptables -A INPUT  -i ens192 -p tcp --dport 80  -j ACCEPT
+iptables -A INPUT  -i ens192 -p tcp --dport 443 -j ACCEPT
+iptables -A OUTPUT -o ens192 -p tcp --sport 80  -j ACCEPT
+iptables -A OUTPUT -o ens192 -p tcp --sport 443 -j ACCEPT
+
+### (3) ANYONE on WAN -> FTP on firewall (control + data)
+iptables -A INPUT  -i ens192 -p tcp --dport 21 -j ACCEPT
+iptables -A INPUT  -i ens192 -p tcp --dport 20 -j ACCEPT
+iptables -A OUTPUT -o ens192 -p tcp --sport 21 -j ACCEPT
+iptables -A OUTPUT -o ens192 -p tcp --sport 20 -j ACCEPT
+
+# ------------------------------------------------------------
+# ALLOW LAN CLIENTS OUT TO INTERNET (so your lab still works)
+# ------------------------------------------------------------
+
+### DNS (UDP + TCP 53) from LAN -> WAN
+iptables -A FORWARD -i ens224 -o ens192 -p udp --dport 53 -j ACCEPT
+iptables -A FORWARD -i ens192 -o ens224 -p udp --sport 53 -j ACCEPT
+iptables -A FORWARD -i ens224 -o ens192 -p tcp --dport 53 -j ACCEPT
+iptables -A FORWARD -i ens192 -o ens224 -p tcp --sport 53 -j ACCEPT
+
+### ICMP (ping) from LAN -> WAN
+iptables -A FORWARD -i ens224 -o ens192 -p icmp --icmp-type echo-request -j ACCEPT
+iptables -A FORWARD -i ens192 -o ens224 -p icmp --icmp-type echo-reply   -j ACCEPT
+
+### Web browsing from LAN -> WAN (HTTP/HTTPS)
+iptables -A FORWARD -i ens224 -o ens192 -p tcp --dport 80  -j ACCEPT
+iptables -A FORWARD -i ens224 -o ens192 -p tcp --dport 443 -j ACCEPT
+
+# Replies back to LAN are covered by ESTABLISHED,RELATED rule above
+
+### NAT Masquerade (LAN -> WAN)
+iptables -t nat -A POSTROUTING -o ens192 -j MASQUERADE
