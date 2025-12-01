@@ -1,70 +1,104 @@
 #!/bin/bash
-# rc.firewall - copy1
-# KF Lab - CentOS FW
-# WAN (external) = ens192 (10.240.101.85)
-# LAN (internal) = ens224 (192.168.10.1)
+# rc.firewall - stateful firewall + NAT
+# WAN (external) = ens192  (10.240.101.85)
+# LAN (internal) = ens224  (192.168.10.1)
 
-### Flush old rules
+# Flush existing rules
 iptables -F
 iptables -t nat -F
 iptables -X
 
-### Enable routing
+# Enable IPv4 forwarding
 echo 1 > /proc/sys/net/ipv4/ip_forward
 
-### Default policies: secure baseline
-iptables -P INPUT DROP
+# Default policies (lockdown)
+iptables -P INPUT   DROP
 iptables -P FORWARD DROP
-iptables -P OUTPUT DROP
+iptables -P OUTPUT  DROP
 
-### Allow loopback
+# -------------------------------------------------------------------
+# Base rules
+# -------------------------------------------------------------------
+
+# Allow loopback
 iptables -A INPUT  -i lo -j ACCEPT
 iptables -A OUTPUT -o lo -j ACCEPT
 
-### Allow established / related traffic
+# Allow established/related traffic
 iptables -A INPUT   -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A OUTPUT  -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
 
-# ------------------------------------------------------------
-# PART 1 REQUIRED RULES
-# ------------------------------------------------------------
+# NAT for traffic going out to the Internet
+iptables -t nat -A POSTROUTING -o ens192 -j MASQUERADE
 
-### (1) INTERNAL clients -> SSH into firewall (LAN side)
-iptables -A INPUT  -i ens224 -s 192.168.10.0/24 -p tcp --dport 22 -j ACCEPT
-iptables -A OUTPUT -o ens224 -d 192.168.10.0/24 -p tcp --sport 22 -j ACCEPT
+# -------------------------------------------------------------------
+# ICMP (ping)
+# -------------------------------------------------------------------
 
-### (2) ANYONE on WAN -> Web on firewall (HTTP + HTTPS)
-iptables -A INPUT  -i ens192 -p tcp --dport 80  -j ACCEPT
-iptables -A INPUT  -i ens192 -p tcp --dport 443 -j ACCEPT
-iptables -A OUTPUT -o ens192 -p tcp --sport 80  -j ACCEPT
-iptables -A OUTPUT -o ens192 -p tcp --sport 443 -j ACCEPT
+# Firewall itself can ping out
+iptables -A OUTPUT -p icmp --icmp-type echo-request -j ACCEPT
+iptables -A INPUT  -p icmp --icmp-type echo-reply   -j ACCEPT
 
-### (3) ANYONE on WAN -> FTP on firewall (control + data)
-iptables -A INPUT  -i ens192 -p tcp --dport 21 -j ACCEPT
-iptables -A INPUT  -i ens192 -p tcp --dport 20 -j ACCEPT
-iptables -A OUTPUT -o ens192 -p tcp --sport 21 -j ACCEPT
-iptables -A OUTPUT -o ens192 -p tcp --sport 20 -j ACCEPT
-
-# ------------------------------------------------------------
-# ALLOW LAN CLIENTS OUT TO INTERNET (so your lab still works)
-# ------------------------------------------------------------
-
-### DNS (UDP + TCP 53) from LAN -> WAN
-iptables -A FORWARD -i ens224 -o ens192 -p udp --dport 53 -j ACCEPT
-iptables -A FORWARD -i ens192 -o ens224 -p udp --sport 53 -j ACCEPT
-iptables -A FORWARD -i ens224 -o ens192 -p tcp --dport 53 -j ACCEPT
-iptables -A FORWARD -i ens192 -o ens224 -p tcp --sport 53 -j ACCEPT
-
-### ICMP (ping) from LAN -> WAN
+# LAN clients can ping through firewall
 iptables -A FORWARD -i ens224 -o ens192 -p icmp --icmp-type echo-request -j ACCEPT
 iptables -A FORWARD -i ens192 -o ens224 -p icmp --icmp-type echo-reply   -j ACCEPT
 
-### Web browsing from LAN -> WAN (HTTP/HTTPS)
+# -------------------------------------------------------------------
+# DNS (firewall + clients)
+# -------------------------------------------------------------------
+
+# Firewall -> Internet DNS
+iptables -A OUTPUT -o ens192 -p udp --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -o ens192 -p tcp --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A INPUT  -i ens192 -p udp --sport 53 -m state --state ESTABLISHED -j ACCEPT
+iptables -A INPUT  -i ens192 -p tcp --sport 53 -m state --state ESTABLISHED -j ACCEPT
+
+# LAN clients -> Internet DNS through firewall
+iptables -A FORWARD -i ens224 -o ens192 -p udp --dport 53 -j ACCEPT
+iptables -A FORWARD -i ens224 -o ens192 -p tcp --dport 53 -j ACCEPT
+iptables -A FORWARD -i ens192 -o ens224 -p udp --sport 53 -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A FORWARD -i ens192 -o ens224 -p tcp --sport 53 -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# -------------------------------------------------------------------
+# HTTP / HTTPS
+# -------------------------------------------------------------------
+
+# (A) Firewall box itself: yum, curl, browser, etc.
+iptables -A OUTPUT -o ens192 -p tcp --dport 80  -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -o ens192 -p tcp --dport 443 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A INPUT  -i ens192 -p tcp --sport 80  -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT  -i ens192 -p tcp --sport 443 -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# (B) LAN clients -> Internet via firewall
 iptables -A FORWARD -i ens224 -o ens192 -p tcp --dport 80  -j ACCEPT
 iptables -A FORWARD -i ens224 -o ens192 -p tcp --dport 443 -j ACCEPT
+iptables -A FORWARD -i ens192 -o ens224 -p tcp --sport 80  -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A FORWARD -i ens192 -o ens224 -p tcp --sport 443 -m state --state ESTABLISHED,RELATED -j ACCEPT
 
-# Replies back to LAN are covered by ESTABLISHED,RELATED rule above
+# -------------------------------------------------------------------
+# SSH (examples – adjust to your lab requirements)
+# -------------------------------------------------------------------
 
-### NAT Masquerade (LAN -> WAN)
-iptables -t nat -A POSTROUTING -o ens192 -j MASQUERADE
+# Allow SSH from LAN to firewall
+iptables -A INPUT  -i ens224 -p tcp --dport 22 -j ACCEPT
+iptables -A OUTPUT -o ens224 -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+
+# Uncomment if you also need SSH from WAN to firewall:
+# iptables -A INPUT  -i ens192 -p tcp --dport 22 -j ACCEPT
+# iptables -A OUTPUT -o ens192 -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+
+# -------------------------------------------------------------------
+# FTP to firewall itself (per lab – optional)
+# -------------------------------------------------------------------
+
+iptables -A INPUT  -i ens192 -p tcp --dport 21 -j ACCEPT
+iptables -A INPUT  -i ens224 -p tcp --dport 21 -j ACCEPT
+iptables -A OUTPUT -o ens192 -p tcp --sport 21 -m state --state ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -o ens224 -p tcp --sport 21 -m state --state ESTABLISHED -j ACCEPT
+
+# active FTP data channel
+iptables -A INPUT  -i ens192 -p tcp --dport 20 -j ACCEPT
+iptables -A INPUT  -i ens224 -p tcp --dport 20 -j ACCEPT
+iptables -A OUTPUT -o ens192 -p tcp --sport 20 -m state --state ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -o ens224 -p tcp --sport 20 -m state --state ESTABLISHED -j ACCEPT
